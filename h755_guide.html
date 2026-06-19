@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bare-Metal STM32H755ZIQ — Повний гайд</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=IBM+Plex+Sans:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Serif:wght@400;600&display=swap');
+
+  :root {
+    --bg:        #0f1117;
+    --bg2:       #161820;
+    --bg3:       #1e2030;
+    --border:    #2a2d3e;
+    --text:      #cdd6f4;
+    --muted:     #6c7086;
+    --accent:    #89b4fa;
+    --accent2:   #cba6f7;
+    --green:     #a6e3a1;
+    --yellow:    #f9e2af;
+    --red:       #f38ba8;
+    --orange:    #fab387;
+    --teal:      #94e2d5;
+    --code-bg:   #1e2030;
+    --code-line: #313244;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    min-width: 260px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .nav-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .nav-logo .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(137,180,250,0.1);
+    border: 1px solid rgba(137,180,250,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 6px;
+  }
+  .nav-logo h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  nav ul { list-style: none; }
+  nav ul li a {
+    display: block;
+    padding: 5px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  nav ul li a:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+    border-left-color: var(--accent);
+  }
+  nav ul li a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(137,180,250,0.08);
+  }
+  .nav-section {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding: 14px 20px 4px;
+  }
+  nav ul li a.sub {
+    padding-left: 32px;
+    font-size: 12px;
+  }
+
+  main {
+    flex: 1;
+    max-width: 860px;
+    padding: 48px 56px;
+    min-width: 0;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    margin-bottom: 56px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    background: rgba(203,166,247,0.1);
+    border: 1px solid rgba(203,166,247,0.2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 38px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p {
+    font-size: 16px;
+    color: var(--muted);
+    max-width: 560px;
+  }
+
+  /* ── Sections ── */
+  section { margin-bottom: 64px; }
+
+  h2 {
+    font-family: 'IBM Plex Serif', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    background: rgba(137,180,250,0.1);
+    border: 1px solid rgba(137,180,250,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 400;
+  }
+
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 28px 0 12px;
+  }
+
+  p { margin-bottom: 14px; color: var(--text); }
+
+  /* ── Code ── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 16px 0 20px;
+    position: relative;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  pre code { color: var(--text); }
+  .comment { color: var(--muted); }
+  .kw  { color: var(--accent2); }
+  .ty  { color: var(--teal); }
+  .str { color: var(--green); }
+  .num-lit { color: var(--orange); }
+  .fn  { color: var(--accent); }
+  .mac { color: var(--yellow); }
+  .hl  { background: rgba(137,180,250,0.12); display: block; margin: 0 -20px; padding: 0 20px; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: rgba(137,180,250,0.08);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(137,180,250,0.15);
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+  /* ── Callouts ── */
+  .note, .warn, .tip {
+    padding: 14px 16px;
+    border-radius: 6px;
+    margin: 16px 0 20px;
+    font-size: 14px;
+    display: flex;
+    gap: 10px;
+  }
+  .note { background: rgba(137,180,250,0.08); border-left: 3px solid var(--accent); color: var(--text); }
+  .warn { background: rgba(243,139,168,0.08); border-left: 3px solid var(--red); color: var(--text); }
+  .tip  { background: rgba(166,227,161,0.08); border-left: 3px solid var(--green); color: var(--text); }
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin: 16px 0 20px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead th {
+    background: var(--bg3);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  tbody td {
+    padding: 9px 14px;
+    vertical-align: top;
+    color: var(--text);
+  }
+  tbody td:first-child { color: var(--yellow); font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+  .td-normal td:first-child { color: var(--text); font-family: inherit; font-size: inherit; }
+  tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+
+  /* ── Diff table ── */
+  .diff-old { color: var(--red) !important; }
+  .diff-new { color: var(--green) !important; }
+
+  /* ── Lists ── */
+  ul, ol { padding-left: 22px; margin-bottom: 14px; }
+  li { margin-bottom: 6px; }
+  li p { margin-bottom: 0; }
+
+  /* ── Step header ── */
+  .step-header {
+    background: linear-gradient(135deg, rgba(137,180,250,0.06), rgba(203,166,247,0.04));
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .step-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 44px;
+    line-height: 1.2;
+  }
+  .step-info strong { font-size: 17px; color: #fff; display: block; margin-bottom: 4px; }
+  .step-info span { font-size: 13px; color: var(--muted); }
+
+  /* ── Inline annotation table ── */
+  .annotated {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 16px 0 20px;
+    font-size: 13px;
+  }
+  .ann-code {
+    background: var(--code-bg);
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.65;
+    border-right: 1px solid var(--border);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .ann-comments {
+    background: rgba(249,226,175,0.04);
+    padding: 14px 16px;
+    line-height: 1.65;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .ann-comments .ann-row { margin-bottom: 4px; padding: 2px 0; }
+  .ann-comments .ann-row.hl-row { color: var(--yellow); font-weight: 600; }
+
+  /* ── Memory map visual ── */
+  .memmap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 16px 0 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .mm-row {
+    display: flex;
+    align-items: stretch;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .mm-addr {
+    padding: 8px 12px;
+    color: var(--muted);
+    background: var(--bg3);
+    min-width: 130px;
+    border-right: 1px solid var(--border);
+  }
+  .mm-name {
+    padding: 8px 12px;
+    min-width: 160px;
+    border-right: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .mm-desc { padding: 8px 12px; color: var(--muted); font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; }
+  .mm-flash { background: rgba(137,180,250,0.08); color: var(--accent); }
+  .mm-sram  { background: rgba(166,227,161,0.08);  color: var(--green); }
+  .mm-periph{ background: rgba(203,166,247,0.08); color: var(--accent2); }
+  .mm-gpio  { background: rgba(148,226,213,0.08); color: var(--teal); }
+  .mm-core  { background: rgba(249,226,175,0.08); color: var(--yellow); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Steps nav dots ── */
+  .steps-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+  .step-dot {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .step-dot:hover { border-color: var(--accent); color: var(--accent); }
+
+  strong { color: #fff; font-weight: 600; }
+  em { color: var(--muted); font-style: italic; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="nav-logo">
+    <div class="chip">STM32H755ZIQ</div>
+    <h3>Bare-Metal<br>Programming Guide</h3>
+  </div>
+  <ul>
+    <li class="nav-section">Теорія</li>
+    <li><a href="#ch0">Як влаштований MCU</a></li>
+    <li><a href="#ch0" class="sub">Регістри = адреси</a></li>
+    <li><a href="#ch0" class="sub">volatile</a></li>
+    <li><a href="#ch1">Підготовка</a></li>
+    <li><a href="#ch1" class="sub">Cross-compiler</a></li>
+    <li><a href="#ch1" class="sub">Serial monitor</a></li>
+    <li><a href="#ch2">Linker Script</a></li>
+    <li><a href="#ch3">Startup Code</a></li>
+    <li><a href="#ch4">Makefile</a></li>
+
+    <li class="nav-section">Steps</li>
+    <li><a href="#s0">Step 0 — Minimal</a></li>
+    <li><a href="#s1">Step 1 — Blinky</a></li>
+    <li><a href="#s1" class="sub">GPIO, RCC</a></li>
+    <li><a href="#s2">Step 2 — SysTick</a></li>
+    <li><a href="#s3">Step 3 — UART</a></li>
+    <li><a href="#s4">Step 4 — Printf</a></li>
+    <li><a href="#s5">Step 5 — CMSIS</a></li>
+    <li><a href="#s6">Step 6 — Clock 480MHz</a></li>
+
+    <li class="nav-section">Довідник</li>
+    <li><a href="#ref">F429 → H755</a></li>
+    <li><a href="#errors">Типові помилки</a></li>
+    <li><a href="#pins">Піни плати</a></li>
+  </ul>
+</nav>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <div class="hero">
+    <div class="hero-tag">embedded / bare-metal</div>
+    <h1>Bare-Metal Programming<br><span>STM32H755ZIQ</span></h1>
+    <p>Повний гайд з поясненням кожного рядка коду. Для тих хто знає базовий C, але ніколи не працював з embedded.</p>
+  </div>
+
+  <div class="steps-nav">
+    <a class="step-dot" href="#s0">Step 0</a>
+    <a class="step-dot" href="#s1">Step 1</a>
+    <a class="step-dot" href="#s2">Step 2</a>
+    <a class="step-dot" href="#s3">Step 3</a>
+    <a class="step-dot" href="#s4">Step 4</a>
+    <a class="step-dot" href="#s5">Step 5</a>
+    <a class="step-dot" href="#s6">Step 6</a>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="ch0">
+    <h2><span class="num">Глава 0</span> Як влаштований мікроконтролер</h2>
+
+    <p>Перш ніж писати хоч рядок коду — одна фундаментальна річ. Вона пояснить чому весь embedded-код виглядає саме так.</p>
+
+    <h3>MCU — це комп'ютер на одному чіпі</h3>
+    <p>Мікроконтролер (MCU) — це <strong>процесор + пам'ять + периферія</strong> в одному корпусі. STM32H755ZIQ містить:</p>
+    <ul>
+      <li><strong>Процесор Cortex-M7</strong> — виконує твій код</li>
+      <li><strong>Flash (2 MB)</strong> — незмінна пам'ять, тут живе твоя прошивка</li>
+      <li><strong>RAM (512 KB)</strong> — оперативна пам'ять, тут змінні під час роботи</li>
+      <li><strong>Периферія</strong> — UART, GPIO, SPI, I2C... — апаратні модулі всередині чіпа</li>
+    </ul>
+
+    <h3>Головне відкриття: регістри — це просто адреси в пам'яті</h3>
+    <p>Ось те що більшість підручників пояснюють погано, і через це все здається магією.</p>
+    <p><strong>Периферія в MCU — це просто ділянки пам'яті.</strong> Кожен апаратний модуль (GPIO, UART, SPI...) має свою адресу. Щоб керувати апаратом — ти просто читаєш або пишеш числа за цими адресами.</p>
+
+    <div class="annotated">
+      <div class="ann-code"><span class="comment">// Node.js: не думаєш про пам'ять</span>
+<span class="kw">const</span> led = <span class="kw">new</span> <span class="fn">LED</span>(pin5);
+led.<span class="fn">on</span>();
+
+<span class="comment">// Embedded C: пишеш напряму</span>
+<span class="hl">*(<span class="kw">volatile</span> <span class="ty">uint32_t</span>*)<span class="num-lit">0x58020018</span> = (<span class="num-lit">1</span> &lt;&lt; <span class="num-lit">0</span>);</span></div>
+      <div class="ann-comments">
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row hl-row">← запис за адресою 0x58020018 = "ввімкнути LED на PB0"</div>
+      </div>
+    </div>
+
+    <div class="note"><span class="callout-icon">💡</span><span>Регістр — це просто 32-бітне число за конкретною адресою. Запис у нього = команда апаратному модулю.</span></div>
+
+    <h3>Карта пам'яті MCU</h3>
+    <p>Пам'ять H755 поділена на регіони. Кожен — для своїх цілей:</p>
+
+    <div class="memmap">
+      <div class="mm-row">
+        <div class="mm-addr">0x08000000</div>
+        <div class="mm-name mm-flash">Flash (2 MB)</div>
+        <div class="mm-desc">Твоя прошивка — код і константи. Не зникає при вимкненні.</div>
+      </div>
+      <div class="mm-row">
+        <div class="mm-addr">0x24000000</div>
+        <div class="mm-name mm-sram">AXI SRAM (512 KB)</div>
+        <div class="mm-desc">Змінні, стек, буфери під час роботи. Очищується при вимкненні.</div>
+      </div>
+      <div class="mm-row">
+        <div class="mm-addr">0x40000000</div>
+        <div class="mm-name mm-periph">APB1/APB2</div>
+        <div class="mm-desc">UART, SPI, I2C, таймери...</div>
+      </div>
+      <div class="mm-row">
+        <div class="mm-addr">0x58020000</div>
+        <div class="mm-name mm-gpio">GPIO (AHB4)</div>
+        <div class="mm-desc">GPIO банки A–K. На F429 це було 0x40020000.</div>
+      </div>
+      <div class="mm-row">
+        <div class="mm-addr">0xE000E010</div>
+        <div class="mm-name mm-core">Cortex-M ядро</div>
+        <div class="mm-desc">SysTick, NVIC, SCB. Однакова адреса на БУДЬ-ЯКОМУ Cortex-M.</div>
+      </div>
+    </div>
+
+    <h3>Що таке <code>volatile</code> і чому це критично</h3>
+    <p>Компілятор C оптимізує код. Якщо він бачить <code>x = 5; x = 5;</code> — залишить один запис, бо "навіщо двічі".</p>
+    <p><strong>З регістрами це катастрофа.</strong> Кожен запис у регістр — команда апарату. Пропускати не можна.</p>
+    <p>Ключове слово <code>volatile</code> забороняє компілятору оптимізувати звернення до цієї адреси. Тому перед кожним регістром пишуть <code>volatile uint32_t *</code>.</p>
+    <div class="tip"><span class="callout-icon">✅</span><span><code>volatile</code> = "не оптимізуй, кожне читання/запис має реально відбутися в пам'яті"</span></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="ch1">
+    <h2><span class="num">Глава 1</span> Підготовка на macOS</h2>
+
+    <h3>Що таке cross-compiler</h3>
+    <p>На macOS <code>gcc</code> компілює програму <strong>для macOS</strong>. Але STM32H755 — архітектура ARM Cortex-M7. Програма для macOS там не запуститься.</p>
+    <p><code>arm-none-eabi-gcc</code> — це <strong>cross-compiler</strong>: запускається на macOS, але компілює <strong>для ARM</strong>. "none-eabi" = без ОС (bare-metal), стандартний ABI.</p>
+
+    <div class="table-wrap"><table class="td-normal">
+      <thead><tr><th>Компілятор</th><th>Для чого</th></tr></thead>
+      <tbody>
+        <tr><td><code>gcc</code></td><td>Компілює для твого MacBook (macOS)</td></tr>
+        <tr><td><code>arm-none-eabi-gcc</code></td><td>Компілює для STM32 (ARM Cortex-M7)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Встановлення (Terminal)</h3>
+    <pre><code><span class="comment"># Homebrew (якщо немає)</span>
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+<span class="comment"># Cross-compiler і утиліти</span>
+brew install --cask gcc-arm-embedded
+brew install make stlink minicom
+
+<span class="comment"># Перевірка</span>
+arm-none-eabi-gcc --version   <span class="comment"># → arm-none-eabi-gcc 13.x.x</span>
+st-flash --version            <span class="comment"># → v1.7.x</span></code></pre>
+
+    <h3>Що таке serial monitor і <code>ls /dev/tty.usbmodem*</code></h3>
+    <p>Коли підключаєш Nucleo до MacBook через USB, ST-Link чіп на платі створює <strong>два пристрої одночасно</strong>:</p>
+    <ul>
+      <li><strong>Програматор</strong> — дозволяє прошивати плату командою <code>st-flash</code></li>
+      <li><strong>Virtual COM port</strong> — виглядає як послідовний порт, через нього UART дані з MCU виводяться в Terminal</li>
+    </ul>
+    <p>Ім'я цього порту на macOS виглядає як <code>/dev/tty.usbmodem143201</code>. Число в кінці щоразу різне, тому <code>ls /dev/tty.usbmodem*</code> — зірочка замінює будь-які символи:</p>
+    <pre><code><span class="comment"># Перевірити що плата видна:</span>
+ls /dev/tty.usbmodem*
+
+<span class="comment"># Якщо плата підключена — побачиш:</span>
+<span class="str">/dev/tty.usbmodem143201</span>
+
+<span class="comment"># Якщо нічого — або неправильний USB-роз'єм, або кабель тільки для зарядки</span></code></pre>
+
+    <pre><code><span class="comment"># Запустити serial monitor (бачити вивід з MCU):</span>
+minicom -b 115200 -D /dev/tty.usbmodem*
+
+<span class="comment"># -b 115200  = швидкість передачі (baud rate)</span>
+<span class="comment"># -D         = порт пристрою</span>
+<span class="comment"># Вийти: Ctrl+A, потім X, потім Enter</span></code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="ch2">
+    <h2><span class="num">Глава 2</span> Linker Script — де живе твій код</h2>
+
+    <p><code>arm-none-eabi-gcc</code> перетворює C-код у машинні інструкції. Але він не знає: за якою адресою Flash? Скільки RAM? Де стек? Це все вказується у файлі <strong>link.ld</strong>.</p>
+
+    <h3>Три етапи збірки</h3>
+    <ol>
+      <li><strong>Компіляція</strong> <code>gcc -c</code> → <code>main.c → main.o</code> (об'єктний файл)</li>
+      <li><strong>Лінкування</strong> <code>gcc -T link.ld</code> → <code>firmware.elf</code> (розставити по адресах)</li>
+      <li><strong>Конвертація</strong> <code>objcopy -O binary</code> → <code>firmware.bin</code> (чистий бінарник)</li>
+    </ol>
+    <div class="note"><span class="callout-icon">💡</span><span>ELF — формат з debug метаданими. BIN — чистий бінарник. Flash потребує BIN.</span></div>
+
+    <h3>link.ld для H755 — рядок за рядком</h3>
+
+    <div class="annotated">
+      <div class="ann-code"><span class="kw">ENTRY</span>(_reset);</div>
+      <div class="ann-comments">
+        <div class="ann-row hl-row">Точка входу — перша функція після увімкнення. Не main(), а _reset() — вона ініціалізує пам'ять і потім викликає main()</div>
+      </div>
+    </div>
+
+    <div class="annotated">
+      <div class="ann-code"><span class="kw">MEMORY</span> {
+  flash(rx)  : <span class="kw">ORIGIN</span> = <span class="num-lit">0x08000000</span>, <span class="kw">LENGTH</span> = <span class="num-lit">2048k</span>
+  sram(rwx)  : <span class="kw">ORIGIN</span> = <span class="num-lit">0x24000000</span>, <span class="kw">LENGTH</span> = <span class="num-lit">512k</span>
+}</div>
+      <div class="ann-comments">
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">Flash: rx = read+execute. Адреса 0x08000000 — стандарт для STM32</div>
+        <div class="ann-row">SRAM: rwx = повний доступ. 0x24000000 = AXI SRAM на H755 (F429 мав 0x20000000!)</div>
+        <div class="ann-row">&nbsp;</div>
+      </div>
+    </div>
+
+    <div class="warn"><span class="callout-icon">⚠️</span><span>У оригінальному гайді (F429) RAM = <code>0x20000000</code>. На H755 це інша адреса — <code>0x24000000</code>. Якщо не змінити — HardFault одразу після старту.</span></div>
+
+    <div class="annotated">
+      <div class="ann-code">_estack = <span class="kw">ORIGIN</span>(sram) + <span class="kw">LENGTH</span>(sram);</div>
+      <div class="ann-comments">
+        <div class="ann-row hl-row">Стек росте донизу. Початок = кінець RAM = 0x24000000 + 512KB = 0x24080000</div>
+      </div>
+    </div>
+
+    <h3>Секції пам'яті</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Секція</th><th>Що містить</th><th>Де в пам'яті</th></tr></thead>
+      <tbody>
+        <tr><td>.vectors</td><td>Таблиця адрес обробників переривань</td><td>Flash (самий початок)</td></tr>
+        <tr><td>.text</td><td>Машинний код функцій</td><td>Flash</td></tr>
+        <tr><td>.rodata</td><td>Константи (<code>const</code>, рядкові літерали)</td><td>Flash</td></tr>
+        <tr><td>.data</td><td>Ініціалізовані глобальні змінні (<code>int x = 5</code>)</td><td>Зберігаються у Flash, копіюються у RAM при старті</td></tr>
+        <tr><td>.bss</td><td>Неініціалізовані глобальні (<code>int x</code>)</td><td>RAM (обнуляються при старті)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="ch3">
+    <h2><span class="num">Глава 3</span> Startup Code — до main()</h2>
+
+    <p>На звичайному комп'ютері ОС завантажує програму і ініціалізує пам'ять. На bare-metal MCU — ОС немає. Ти робиш це сам у функції <code>_reset()</code>.</p>
+
+    <h3>Послідовність від увімкнення до main()</h3>
+    <ol>
+      <li>MCU читає <strong>перше слово</strong> за адресою 0x08000000 → початкове значення Stack Pointer</li>
+      <li>Читає <strong>друге слово</strong> (0x08000004) → адреса функції <code>_reset()</code></li>
+      <li>Переходить на <code>_reset()</code></li>
+      <li><code>_reset()</code> обнуляє <code>.bss</code></li>
+      <li><code>_reset()</code> копіює <code>.data</code> з Flash у RAM</li>
+      <li><code>_reset()</code> викликає <code>main()</code></li>
+      <li>Твій код починає виконуватись</li>
+    </ol>
+
+    <h3>Vector Table</h3>
+    <p><strong>Vector table</strong> — масив адрес функцій на початку Flash. Перший елемент — stack pointer, другий — <code>_reset</code>, далі обробники переривань.</p>
+
+    <div class="annotated">
+      <div class="ann-code"><span class="kw">__attribute__</span>((section(<span class="str">".vectors"</span>)))
+<span class="kw">void</span> (*<span class="kw">const</span> tab[<span class="num-lit">16</span> + <span class="num-lit">150</span>])(<span class="kw">void</span>) = {
+    _estack,         <span class="comment">// [0] Stack Pointer</span>
+    _reset,          <span class="comment">// [1] Reset Handler</span>
+    <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>, <span class="num-lit">0</span>,
+    SysTick_Handler  <span class="comment">// [15] SysTick</span>
+};</div>
+      <div class="ann-comments">
+        <div class="ann-row">Розмісти масив у секції .vectors</div>
+        <div class="ann-row hl-row">H755: 150 external IRQs (F429 мав 91)</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">Перший елемент — початкове значення стеку</div>
+        <div class="ann-row">Другий — адреса функції старту</div>
+        <div class="ann-row">Placeholder'и для інших переривань</div>
+        <div class="ann-row">Індекс 15 — стандартна позиція SysTick</div>
+      </div>
+    </div>
+
+    <h3>Функція _reset()</h3>
+    <div class="annotated">
+      <div class="ann-code"><span class="kw">__attribute__</span>((naked, noreturn))
+<span class="kw">void</span> <span class="fn">_reset</span>(<span class="kw">void</span>) {
+  <span class="kw">extern long</span> _sbss, _ebss, _sdata, _edata, _sidata;
+
+  <span class="comment">// Обнулити .bss</span>
+  <span class="kw">for</span> (<span class="kw">long</span> *dst = &amp;_sbss; dst &lt; &amp;_ebss; dst++)
+    *dst = <span class="num-lit">0</span>;
+
+  <span class="comment">// Скопіювати .data з Flash у RAM</span>
+  <span class="kw">for</span> (<span class="kw">long</span> *dst = &amp;_sdata, *src = &amp;_sidata;
+       dst &lt; &amp;_edata;) *dst++ = *src++;
+
+  <span class="fn">main</span>();
+  <span class="kw">for</span> (;;) (<span class="kw">void</span>) <span class="num-lit">0</span>;
+}</div>
+      <div class="ann-comments">
+        <div class="ann-row">naked = не генерувати prologue/epilogue</div>
+        <div class="ann-row">noreturn = ніколи не повертається</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">Адреси секцій визначені у link.ld</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">Глобальні неініціалізовані змінні мають бути 0</div>
+        <div class="ann-row">Стандарт C це гарантує, але ОС немає — робимо вручну</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">int x=5 зберігається у Flash, копіюємо у RAM</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">Тепер RAM готова — викликаємо main()</div>
+        <div class="ann-row">Якщо main() повернеться — зависаємо</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="ch4">
+    <h2><span class="num">Глава 4</span> Makefile</h2>
+
+    <p><code>make</code> читає Makefile і виконує команди. Замість довгого рядка компіляції вручну — просто <code>make</code>.</p>
+
+    <h3>Прапори компілятора</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Прапор</th><th>Що означає</th></tr></thead>
+      <tbody>
+        <tr><td>-mcpu=cortex-m7</td><td>Цільова архітектура: Cortex-M7. <em>F429 мав cortex-m4</em></td></tr>
+        <tr><td>-mfpu=fpv5-d16</td><td>FPU версія FPv5-D16. <em>F429 мав fpv4-sp-d16</em></td></tr>
+        <tr><td>-mfloat-abi=hard</td><td>Апаратна FPU, float через FPU-регістри</td></tr>
+        <tr><td>-mthumb</td><td>Thumb-2 інструкції (компактніші, 16-бітні)</td></tr>
+        <tr><td>-Os</td><td>Оптимізувати під розмір коду</td></tr>
+        <tr><td>-g3</td><td>Додати debug інформацію (для GDB)</td></tr>
+        <tr><td>-ffunction-sections</td><td>Кожна функція в окрему секцію → gc-sections видалить невикористані</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Цілі Makefile</h3>
+    <pre><code>make          <span class="comment"># або make build — компілює firmware.bin</span>
+make flash    <span class="comment"># прошиває плату (потрібна підключена плата)</span>
+make clean    <span class="comment"># видаляє всі згенеровані файли</span></code></pre>
+  </section>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s0">
+    <div class="step-header">
+      <div class="step-badge">S0</div>
+      <div class="step-info">
+        <strong>Minimal — мінімальна прошивка</strong>
+        <span>Мета: перевірити що тулчейн працює. Прошивка нічого не робить — просто компілюється і прошивається без помилок.</span>
+      </div>
+    </div>
+
+    <pre><code><span class="comment">// main.c</span>
+<span class="ty">int</span> <span class="fn">main</span>(<span class="kw">void</span>) {
+  <span class="kw">return</span> <span class="num-lit">0</span>;
+}
+
+<span class="kw">__attribute__</span>((naked, noreturn)) <span class="kw">void</span> <span class="fn">_reset</span>(<span class="kw">void</span>) {
+  <span class="kw">extern long</span> _sbss, _ebss, _sdata, _edata, _sidata;
+  <span class="kw">for</span> (<span class="kw">long</span> *dst = &amp;_sbss; dst &lt; &amp;_ebss; dst++) *dst = <span class="num-lit">0</span>;
+  <span class="kw">for</span> (<span class="kw">long</span> *dst = &amp;_sdata, *src = &amp;_sidata; dst &lt; &amp;_edata;) *dst++ = *src++;
+  <span class="fn">main</span>();
+  <span class="kw">for</span> (;;) (<span class="kw">void</span>) <span class="num-lit">0</span>;
+}
+
+<span class="kw">extern void</span> _estack(<span class="kw">void</span>);
+
+<span class="comment">// H755 = 16 + 150 (F429 мав 16 + 91)</span>
+<span class="kw">__attribute__</span>((section(<span class="str">".vectors"</span>)))
+<span class="kw">void</span> (*<span class="kw">const</span> tab[<span class="num-lit">16</span> + <span class="num-lit">150</span>])(<span class="kw">void</span>) = { _estack, _reset };</code></pre>
+
+    <pre><code><span class="comment">// link.ld</span>
+<span class="kw">ENTRY</span>(_reset);
+<span class="kw">MEMORY</span> {
+  flash(rx)  : <span class="kw">ORIGIN</span> = <span class="num-lit">0x08000000</span>, <span class="kw">LENGTH</span> = <span class="num-lit">2048k</span>
+  sram(rwx)  : <span class="kw">ORIGIN</span> = <span class="num-lit">0x24000000</span>, <span class="kw">LENGTH</span> = <span class="num-lit">512k</span>  <span class="comment">// ← H755!</span>
+}
+_estack = <span class="kw">ORIGIN</span>(sram) + <span class="kw">LENGTH</span>(sram);
+<span class="kw">SECTIONS</span> {
+  .vectors : { <span class="kw">KEEP</span>(*(.vectors)) }  &gt; flash
+  .text    : { *(.text*) }            &gt; flash
+  .rodata  : { *(.rodata*) }          &gt; flash
+  .data : {
+    _sdata = .;  *(.first_data) *(.data <span class="kw">SORT</span>(.data.*))  _edata = .;
+  } &gt; sram <span class="kw">AT</span> &gt; flash
+  _sidata = <span class="kw">LOADADDR</span>(.data);
+  .bss : { _sbss = .; *(.bss <span class="kw">SORT</span>(.bss.*) <span class="kw">COMMON</span>) _ebss = .; } &gt; sram
+  . = <span class="kw">ALIGN</span>(<span class="num-lit">8</span>);  _end = .;
+}</code></pre>
+
+    <pre><code><span class="comment">// Makefile</span>
+CFLAGS  ?= -W -Wall -Wextra -Werror -Wundef -Wshadow -Wdouble-promotion \
+           -fno-common -Wconversion -g3 -Os -ffunction-sections \
+           -fdata-sections -I. \
+           <span class="hl">-mcpu=cortex-m7 -mthumb -mfloat-abi=hard -mfpu=fpv5-d16</span>
+LDFLAGS ?= -Tlink.ld -nostartfiles -nostdlib --specs nano.specs \
+           -lc -lgcc -Wl,--gc-sections -Wl,-Map=$@.map
+SOURCES  = main.c
+
+build: firmware.bin
+firmware.elf: $(SOURCES)
+	arm-none-eabi-gcc $(SOURCES) $(CFLAGS) $(LDFLAGS) -o $@
+firmware.bin: firmware.elf
+	arm-none-eabi-objcopy -O binary $&lt; $@
+flash: firmware.bin
+	st-flash --reset write $&lt; 0x8000000
+clean:
+	rm -f firmware.*</code></pre>
+
+    <pre><code>cd steps/step-0-minimal/
+make
+
+<span class="comment"># Перевірити розміри секцій:</span>
+arm-none-eabi-size firmware.elf
+<span class="comment">#    text    data     bss     dec</span>
+<span class="comment">#     408       0       0     408  ← тільки startup code, нічого зайвого</span>
+
+make flash
+<span class="comment"># → Flash written and verified! jolly good!</span></code></pre>
+
+    <div class="tip"><span class="callout-icon">✅</span><span>"jolly good!" — прошивка записана. MCU запустився, пройшов _reset() → main() → повернувся → завис. LED не мигає — це правильно.</span></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s1">
+    <div class="step-header">
+      <div class="step-badge">S1</div>
+      <div class="step-info">
+        <strong>Blinky — мигання LED через регістри</strong>
+        <span>Мета: запалити зелений LED (PB0) вручну без жодних бібліотек.</span>
+      </div>
+    </div>
+
+    <h3>Три кроки щоб увімкнути LED</h3>
+    <div class="table-wrap"><table class="td-normal">
+      <thead><tr><th>Крок</th><th>Що робимо</th><th>Регістр</th></tr></thead>
+      <tbody>
+        <tr><td>1. Clock enable</td><td>Вмикаємо тактування GPIOB</td><td><code>RCC→AHB4ENR</code>, біт 1</td></tr>
+        <tr><td>2. Mode set</td><td>Налаштовуємо PB0 як вихід</td><td><code>GPIOB→MODER</code>, біти [1:0] = 01</td></tr>
+        <tr><td>3. Write</td><td>Виставляємо PB0 = 1 (LED on)</td><td><code>GPIOB→BSRR</code>, біт 0</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Чому треба "вмикати тактування"?</h3>
+    <p>MCU економить енергію — більшість периферії вимкнена за замовчуванням. Перш ніж писати в регістри GPIO, треба дозволити тактовий сигнал через RCC (Reset and Clock Control). На H755 GPIO на шині AHB4, тому <code>RCC->AHB4ENR</code>.</p>
+
+    <h3>H755 vs F429: GPIO адреси</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Що</th><th class="diff-old">F429 (оригінал)</th><th class="diff-new">H755 (твоя плата)</th></tr></thead>
+      <tbody>
+        <tr><td>GPIO base адреса</td><td class="diff-old">0x40020000</td><td class="diff-new">0x58020000</td></tr>
+        <tr><td>RCC для GPIO</td><td class="diff-old">RCC->AHB1ENR</td><td class="diff-new">RCC->AHB4ENR</td></tr>
+        <tr><td>RCC base</td><td class="diff-old">0x40023800</td><td class="diff-new">0x58024400</td></tr>
+        <tr><td>LED пін</td><td class="diff-old">PB7 (Blue)</td><td class="diff-new">PB0 (Green, LED1)</td></tr>
+      </tbody>
+    </table></div>
+
+    <pre><code><span class="comment">// main.c для Step 1 — H755</span>
+<span class="kw">#include</span> &lt;inttypes.h&gt;
+<span class="kw">#include</span> &lt;stdbool.h&gt;
+
+<span class="mac">#define BIT(x)         (1UL &lt;&lt; (x))</span>
+<span class="mac">#define PIN(bank, num) ((((bank) - 'A') &lt;&lt; 8) | (num))</span>
+<span class="mac">#define PINNO(pin)     ((pin) &amp; 255)</span>
+<span class="mac">#define PINBANK(pin)   ((pin) &gt;&gt; 8)</span>
+
+<span class="comment">// GPIO struct — відображення регістрів периферії</span>
+<span class="comment">// volatile = компілятор НЕ оптимізує звернення</span>
+<span class="kw">struct</span> gpio {
+  <span class="kw">volatile</span> <span class="ty">uint32_t</span> MODER, OTYPER, OSPEEDR, PUPDR,
+                    IDR, ODR, BSRR, LCKR, AFR[<span class="num-lit">2</span>];
+};
+<span class="comment">// H755: GPIO base = 0x58020000, крок між банками = 0x400</span>
+<span class="mac">#define GPIO(bank) ((struct gpio *)(0x58020000UL + 0x400UL * (bank)))</span>
+
+<span class="kw">enum</span> { GPIO_MODE_INPUT, GPIO_MODE_OUTPUT, GPIO_MODE_AF, GPIO_MODE_ANALOG };
+
+<span class="kw">static inline void</span> <span class="fn">gpio_set_mode</span>(<span class="ty">uint16_t</span> pin, <span class="ty">uint8_t</span> mode) {
+  <span class="kw">struct</span> gpio *gpio = <span class="fn">GPIO</span>(<span class="fn">PINBANK</span>(pin));
+  <span class="ty">int</span> n = <span class="fn">PINNO</span>(pin);
+  gpio-&gt;MODER &amp;= ~(<span class="num-lit">3U</span> &lt;&lt; (n * <span class="num-lit">2</span>));         <span class="comment">// Очистити 2 біти</span>
+  gpio-&gt;MODER |=  (mode &amp; <span class="num-lit">3U</span>) &lt;&lt; (n * <span class="num-lit">2</span>);  <span class="comment">// Записати новий режим</span>
+}
+
+<span class="kw">static inline void</span> <span class="fn">gpio_write</span>(<span class="ty">uint16_t</span> pin, <span class="ty">bool</span> val) {
+  <span class="kw">struct</span> gpio *gpio = <span class="fn">GPIO</span>(<span class="fn">PINBANK</span>(pin));
+  <span class="comment">// val=true:  пишемо в нижній halfword → Set (пін = 1)</span>
+  <span class="comment">// val=false: зсув на 16 → верхній halfword → Reset (пін = 0)</span>
+  gpio-&gt;BSRR = (<span class="num-lit">1U</span> &lt;&lt; <span class="fn">PINNO</span>(pin)) &lt;&lt; (val ? <span class="num-lit">0</span> : <span class="num-lit">16</span>);
+}
+
+<span class="comment">// H755: RCC base = 0x58024400, AHB4ENR offset = 0xE0</span>
+<span class="mac">#define RCC_AHB4ENR (*((volatile uint32_t *)(0x58024400UL + 0xE0UL)))</span>
+
+<span class="kw">static inline void</span> <span class="fn">spin</span>(<span class="kw">volatile</span> <span class="ty">uint32_t</span> count) {
+  <span class="kw">while</span> (count--) <span class="fn">__asm__</span>(<span class="str">"nop"</span>);
+}
+
+<span class="ty">int</span> <span class="fn">main</span>(<span class="kw">void</span>) {
+  <span class="ty">uint16_t</span> led = <span class="fn">PIN</span>(<span class="str">'B'</span>, <span class="num-lit">0</span>);               <span class="comment">// LED1 = PB0 на Nucleo-H755</span>
+  <span class="fn">RCC_AHB4ENR</span> |= <span class="fn">BIT</span>(<span class="fn">PINBANK</span>(led));         <span class="comment">// Вмикаємо clock GPIOB (біт 1)</span>
+  <span class="fn">gpio_set_mode</span>(led, GPIO_MODE_OUTPUT);      <span class="comment">// PB0 → вихід</span>
+  <span class="kw">for</span> (;;) {
+    <span class="fn">gpio_write</span>(led, <span class="kw">true</span>);                   <span class="comment">// LED on</span>
+    <span class="fn">spin</span>(<span class="num-lit">3000000</span>);
+    <span class="fn">gpio_write</span>(led, <span class="kw">false</span>);                  <span class="comment">// LED off</span>
+    <span class="fn">spin</span>(<span class="num-lit">3000000</span>);
+  }
+}</code></pre>
+
+    <pre><code>cd steps/step-1-blinky/
+make &amp;&amp; make flash
+<span class="comment"># Результат: зелений LED (PB0) мигає ~1 Гц</span></code></pre>
+
+    <div class="warn"><span class="callout-icon">⚠️</span><span>Якщо LED не мигає — перевір: <code>RCC_AHB4ENR</code> (не AHB1ENR), <code>GPIO base 0x58020000</code> (не 0x40020000), <code>RAM 0x24000000</code> в link.ld.</span></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s2">
+    <div class="step-header">
+      <div class="step-badge">S2</div>
+      <div class="step-info">
+        <strong>SysTick — точний таймер</strong>
+        <span>Мета: замінити неточну <code>spin()</code> на реальні мілісекунди.</span>
+      </div>
+    </div>
+
+    <p><strong>SysTick</strong> — 24-бітний countdown таймер вбудований у кожен процесор Cortex-M. Адреса <code>0xE000E010</code> однакова для будь-якого STM32. Код SysTick не потребує змін при переході з F429 на H755.</p>
+
+    <p><strong>Єдина зміна</strong> — початкова частота. H755 стартує з HSI = <strong>64 MHz</strong>, а не 16 MHz:</p>
+
+    <div class="annotated">
+      <div class="ann-code"><span class="comment">// F429 оригінал:</span>
+<span class="fn">systick_init</span>(<span class="num-lit">16000000</span> / <span class="num-lit">1000</span>);
+
+<span class="comment">// H755:</span>
+<span class="hl"><span class="fn">systick_init</span>(<span class="num-lit">64000000</span> / <span class="num-lit">1000</span>);</span></div>
+      <div class="ann-comments">
+        <div class="ann-row">16 MHz / 1000 = 16000 тактів/мс</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row hl-row">64 MHz / 1000 = 64000 тактів/мс ← правильно для H755</div>
+      </div>
+    </div>
+
+    <div class="warn"><span class="callout-icon">⚠️</span><span>Якщо залишити 16000000 — тіки будуть у 4 рази рідші. LED буде мигати повільніше ніж очікуєш.</span></div>
+
+    <p>Змінна <code>s_ticks</code> має бути <code>volatile</code> — вона змінюється в перериванні (SysTick_Handler) і читається в main(). Без volatile компілятор закешує значення і main() ніколи не побачить оновлення.</p>
+
+    <pre><code><span class="kw">static volatile</span> <span class="ty">uint32_t</span> s_ticks;  <span class="comment">// volatile обов'язково!</span>
+
+<span class="kw">void</span> <span class="fn">SysTick_Handler</span>(<span class="kw">void</span>) {        <span class="comment">// Викликається кожну 1 мс</span>
+  s_ticks++;
+}
+
+<span class="comment">// Використання — не блокує виконання:</span>
+<span class="ty">uint32_t</span> timer = <span class="num-lit">0</span>;
+<span class="kw">if</span> (<span class="fn">timer_expired</span>(&amp;timer, <span class="num-lit">500</span>, s_ticks)) {
+  <span class="comment">// Виконається кожні рівно 500 мс</span>
+}</code></pre>
+
+    <pre><code>cd steps/step-2-systick/
+make &amp;&amp; make flash
+<span class="comment"># LED мигає рівно 500 мс on / 500 мс off</span></code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s3">
+    <div class="step-header">
+      <div class="step-badge">S3</div>
+      <div class="step-info">
+        <strong>UART — debug через serial</strong>
+        <span>Мета: відправляти текст з MCU в Terminal на MacBook.</span>
+      </div>
+    </div>
+
+    <p>Піни <strong>PD8 (TX)</strong> і <strong>PD9 (RX)</strong> підключені до ST-Link чіпа. ST-Link перетворює UART в USB. На MacBook з'являється virtual COM port — і ти бачиш вивід у minicom.</p>
+
+    <h3>Критичні відмінності H755 vs F429</h3>
+    <div class="warn"><span class="callout-icon">⚠️</span><span>Регістри UART на H755 мають інші назви. Якщо використати <code>uart->SR</code> або <code>uart->DR</code> — звернешся за неправильними адресами.</span></div>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Операція</th><th class="diff-old">F429</th><th class="diff-new">H755</th></tr></thead>
+      <tbody>
+        <tr><td>Статус UART</td><td class="diff-old">uart->SR</td><td class="diff-new">uart->ISR</td></tr>
+        <tr><td>Записати байт</td><td class="diff-old">uart->DR = byte</td><td class="diff-new">uart->TDR = byte</td></tr>
+        <tr><td>Прочитати байт</td><td class="diff-old">uart->DR</td><td class="diff-new">uart->RDR</td></tr>
+        <tr><td>UART3 clock</td><td class="diff-old">RCC->APB1ENR</td><td class="diff-new">RCC->APB1LENR</td></tr>
+        <tr><td>BRR для 115200</td><td class="diff-old">16000000/115200 = 138</td><td class="diff-new">64000000/115200 = 555</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="annotated">
+      <div class="ann-code"><span class="kw">struct</span> uart {
+  <span class="kw">volatile</span> <span class="ty">uint32_t</span> CR1, CR2, CR3, BRR,
+                    GTPR, RTOR, RQR,
+                    <span class="hl">ISR,</span>
+                    ICR,
+                    <span class="hl">RDR,</span>
+                    <span class="hl">TDR;</span>
+};</div>
+      <div class="ann-comments">
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row hl-row">ISR замість SR на H755</div>
+        <div class="ann-row">&nbsp;</div>
+        <div class="ann-row hl-row">RDR = тільки для читання</div>
+        <div class="ann-row hl-row">TDR = тільки для запису</div>
+      </div>
+    </div>
+
+    <pre><code>cd steps/step-3-uart/
+make &amp;&amp; make flash
+
+<span class="comment"># Відкрий serial monitor:</span>
+minicom -b 115200 -D /dev/tty.usbmodem*
+
+<span class="comment"># Очікуваний вивід кожні 500 мс:</span>
+<span class="str">hi</span>
+<span class="str">hi</span>
+<span class="str">hi</span></code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s4">
+    <div class="step-header">
+      <div class="step-badge">S4</div>
+      <div class="step-info">
+        <strong>Printf — зручний debug вивід</strong>
+        <span>Мета: писати <code>printf("temp: %d\n", temp)</code> і бачити у Terminal.</span>
+      </div>
+    </div>
+
+    <p><code>printf()</code> не знає нічого про UART. Вона викликає системну функцію <code>_write(fd, ptr, len)</code>. В <code>syscalls.c</code> ми перевизначаємо її: якщо fd == 1 (stdout) — відправляємо через UART.</p>
+
+    <pre><code><span class="comment">// syscalls.c — ключова функція</span>
+<span class="ty">int</span> <span class="fn">_write</span>(<span class="ty">int</span> fd, <span class="ty">char</span> *ptr, <span class="ty">int</span> len) {
+  (<span class="kw">void</span>) fd;
+  <span class="kw">if</span> (fd == <span class="num-lit">1</span>) <span class="fn">uart_write_buf</span>(USART3, ptr, (<span class="ty">size_t</span>) len);
+  <span class="kw">return</span> len;
+}</code></pre>
+
+    <p>З цього кроку весь код периферії виноситься в <code>hal.h</code>. Він містить всі H755-специфічні адреси — не використовуй оригінальний hal.h від F429.</p>
+
+    <pre><code>cd steps/step-4-printf/
+make &amp;&amp; make flash
+minicom -b 115200 -D /dev/tty.usbmodem*
+
+<span class="comment"># Очікуваний вивід:</span>
+<span class="str">LED: 1, tick: 500</span>
+<span class="str">LED: 0, tick: 1000</span></code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s5">
+    <div class="step-header">
+      <div class="step-badge">S5</div>
+      <div class="step-info">
+        <strong>CMSIS — офіційні заголовки від ST</strong>
+        <span>Мета: замінити ручні struct на офіційні визначення. <code>RCC->AHB4ENR</code> замість макросів.</span>
+      </div>
+    </div>
+
+    <p><strong>CMSIS</strong> (Cortex Microcontroller Software Interface Standard) — набір C-файлів від ST з готовими визначеннями всіх регістрів.</p>
+
+    <div class="table-wrap"><table class="td-normal">
+      <thead><tr><th>Без CMSIS</th><th>З CMSIS</th></tr></thead>
+      <tbody>
+        <tr><td><code>struct gpio { volatile uint32_t MODER... }</code></td><td><code>GPIO_TypeDef</code> (офіційний тип)</td></tr>
+        <tr><td><code>((struct gpio*)0x58020000 + bank*0x400)</code></td><td><code>GPIOA</code>, <code>GPIOB</code>... вже визначені</td></tr>
+        <tr><td>Макрос <code>RCC_AHB4ENR</code></td><td><code>RCC->AHB4ENR</code> через офіційний pointer</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>CMSIS для H755: інший репозиторій</h3>
+    <div class="table-wrap"><table class="td-normal">
+      <thead><tr><th class="diff-old">F429 (оригінал)</th><th class="diff-new">H755 (твоя плата)</th></tr></thead>
+      <tbody>
+        <tr><td class="diff-old"><code>cmsis_device_f4</code> (v2.6.8)</td><td class="diff-new"><code>cmsis_device_h7</code> (v1.10.4)</td></tr>
+        <tr><td class="diff-old"><code>startup_stm32f429xx.s</code></td><td class="diff-new"><code>startup_stm32h755xx.s</code></td></tr>
+        <tr><td class="diff-old"><code>stm32f429xx.h</code></td><td class="diff-new"><code>stm32h755xx.h</code></td></tr>
+      </tbody>
+    </table></div>
+
+    <pre><code>cd steps/step-5-cmsis/
+make        <span class="comment"># Завантажить ~100 MB CMSIS (перший раз)</span>
+make flash
+minicom -b 115200 -D /dev/tty.usbmodem*</code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="s6">
+    <div class="step-header">
+      <div class="step-badge">S6</div>
+      <div class="step-info">
+        <strong>Clock — розгін до 480 MHz</strong>
+        <span>Мета: налаштувати PLL і перевести H755 з 64 MHz на максимальні 480 MHz.</span>
+      </div>
+    </div>
+
+    <p><strong>PLL</strong> (Phase-Locked Loop) — схема яка множить частоту. HSI дає 64 MHz, PLL помножує до 480 MHz.</p>
+
+    <pre><code><span class="comment">// Структура тактування після PLL:</span>
+HSI (64 MHz)
+  └─→ PLL1 (M=4, N=60, P=2)
+        └─→ SYSCLK = 480 MHz
+              └─→ HPRE /2
+                    └─→ HCLK = 240 MHz
+                          ├─→ APB1 /2 = <span class="hl">120 MHz</span>  <span class="comment">← USART3 тут!</span>
+                          ├─→ APB2 /2 = 120 MHz
+                          └─→ APB4 /2 = 120 MHz</code></pre>
+
+    <div class="warn"><span class="callout-icon">⚠️</span><span>Після PLL APB1 = 120 MHz (не 64 MHz). Якщо UART BRR розрахований від 64 MHz — отримаєш сміття. В <code>hal.h</code> для step-6 використовується <code>APB1_FREQUENCY = 120 MHz</code>.</span></div>
+
+    <pre><code>cd steps/step-6-clock/
+make &amp;&amp; make flash
+minicom -b 115200 -D /dev/tty.usbmodem*
+
+<span class="comment"># Очікуваний вивід:</span>
+<span class="str">LED: 1, tick: 500, SYSCLK: 480 MHz</span>
+<span class="str">LED: 0, tick: 1000, SYSCLK: 480 MHz</span>
+<span class="comment"># 480 — PLL спрацював ✓</span></code></pre>
+  </section>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="ref">
+    <h2><span class="num">Довідник</span> F429 → H755: всі відмінності</h2>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Що в коді</th><th class="diff-old">F429 (оригінал)</th><th class="diff-new">H755 (твоя плата)</th></tr></thead>
+      <tbody>
+        <tr><td>-mcpu=</td><td class="diff-old">cortex-m4</td><td class="diff-new">cortex-m7</td></tr>
+        <tr><td>-mfpu=</td><td class="diff-old">fpv4-sp-d16</td><td class="diff-new">fpv5-d16</td></tr>
+        <tr><td>GPIO base</td><td class="diff-old">0x40020000</td><td class="diff-new">0x58020000</td></tr>
+        <tr><td>RCC base</td><td class="diff-old">0x40023800</td><td class="diff-new">0x58024400</td></tr>
+        <tr><td>GPIO clock</td><td class="diff-old">RCC->AHB1ENR</td><td class="diff-new">RCC->AHB4ENR</td></tr>
+        <tr><td>UART2/3 clock</td><td class="diff-old">RCC->APB1ENR</td><td class="diff-new">RCC->APB1LENR</td></tr>
+        <tr><td>UART статус</td><td class="diff-old">uart->SR</td><td class="diff-new">uart->ISR</td></tr>
+        <tr><td>UART запис</td><td class="diff-old">uart->DR = byte</td><td class="diff-new">uart->TDR = byte</td></tr>
+        <tr><td>UART читання</td><td class="diff-old">uart->DR</td><td class="diff-new">uart->RDR</td></tr>
+        <tr><td>HSI частота</td><td class="diff-old">16 MHz</td><td class="diff-new">64 MHz</td></tr>
+        <tr><td>SysTick init</td><td class="diff-old">16000000/1000</td><td class="diff-new">64000000/1000</td></tr>
+        <tr><td>Max SYSCLK</td><td class="diff-old">180 MHz</td><td class="diff-new">480 MHz</td></tr>
+        <tr><td>RAM base</td><td class="diff-old">0x20000000</td><td class="diff-new">0x24000000</td></tr>
+        <tr><td>RAM size</td><td class="diff-old">192 KB</td><td class="diff-new">512 KB</td></tr>
+        <tr><td>Vector table</td><td class="diff-old">[16 + 91]</td><td class="diff-new">[16 + 150]</td></tr>
+        <tr><td>CMSIS пакет</td><td class="diff-old">cmsis_device_f4</td><td class="diff-new">cmsis_device_h7</td></tr>
+        <tr><td>CMSIS startup</td><td class="diff-old">startup_stm32f429xx.s</td><td class="diff-new">startup_stm32h755xx.s</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="errors">
+    <h2><span class="num">Довідник</span> Типові помилки</h2>
+
+    <div class="table-wrap"><table class="td-normal">
+      <thead><tr><th>Симптом</th><th>Причина</th><th>Як виправити</th></tr></thead>
+      <tbody>
+        <tr><td>LED не мигає</td><td><code>RCC->AHB1ENR</code> замість AHB4ENR</td><td>В <code>gpio_set_mode</code>: <code>RCC->AHB4ENR |= BIT(bank)</code></td></tr>
+        <tr><td>UART виводить сміття</td><td>BRR від 16 MHz замість 64 MHz</td><td><code>BRR = 64000000 / 115200 = 555</code></td></tr>
+        <tr><td><code>uart_write</code> зависає</td><td><code>uart->SR</code> замість <code>uart->ISR</code></td><td><code>while ((uart->ISR & BIT(7)) == 0)</code></td></tr>
+        <tr><td>HardFault одразу</td><td>RAM = <code>0x20000000</code> в link.ld</td><td>Виправити на <code>0x24000000</code></td></tr>
+        <tr><td>Після PLL — сміття</td><td>BRR не перерахований</td><td><code>BRR = APB1_FREQUENCY / baud</code> (120 MHz)</td></tr>
+        <tr><td>"make: not found"</td><td>make не встановлений</td><td><code>brew install make</code></td></tr>
+        <tr><td>"st-flash: not found"</td><td>stlink не встановлений</td><td><code>brew install stlink</code></td></tr>
+        <tr><td>ls /dev/tty.usbmodem* порожньо</td><td>Неправильний USB-роз'єм або кабель</td><td>Використовуй CN1 (ST-Link роз'єм), перевір кабель</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <section id="pins">
+    <h2><span class="num">Довідник</span> Піни плати (Nucleo-H755ZI-Q)</h2>
+
+    <div class="table-wrap"><table class="td-normal">
+      <thead><tr><th>Функція</th><th>Пін</th><th>Примітка</th></tr></thead>
+      <tbody>
+        <tr><td>LED1 (зелений)</td><td><code>PB0</code></td><td>GPIO Bank B, pin 0</td></tr>
+        <tr><td>LED2 (жовтий)</td><td><code>PE1</code></td><td>GPIO Bank E, pin 1</td></tr>
+        <tr><td>LED3 (червоний)</td><td><code>PB14</code></td><td>GPIO Bank B, pin 14</td></tr>
+        <tr><td>UART TX → MacBook</td><td><code>PD8</code></td><td>USART3, AF7</td></tr>
+        <tr><td>UART RX ← MacBook</td><td><code>PD9</code></td><td>USART3, AF7</td></tr>
+        <tr><td>Кнопка USER</td><td><code>PC13</code></td><td>Active LOW (натиснуто = 0)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+</main>
+</div>
+
+<script>
+  // Active nav highlighting
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a[href^="#"]');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.2 });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
